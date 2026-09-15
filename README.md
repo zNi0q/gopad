@@ -342,6 +342,10 @@ System libraries (not vendored): `libwebkit2gtk-4.1`, `libgtk-3`, `libsqlite3`.
 
 You are on a distro that ships `webkit2gtk-4.1` (Arch, Fedora 37+, Ubuntu 22.10+). Build with the `webkit2_41` tag — `make build` does this for you, or pass `-tags webkit2_41` to `go build` directly (see [Building Manually](#building-manually)).
 
+**Downloaded `gopad-linux-amd64` fails with `error while loading shared libraries: libwebkit2gtk-4.0.so.37`**
+
+The published Linux release binary is built against `webkit2gtk-4.1` (see the note above `runs-on` in `.github/workflows/release.yml`), matching what `make build` produces locally. On a distro that only ships `webkit2gtk-4.0`, install `webkit2gtk-4.1` if your package manager offers it, or build from source per [Building Manually](#building-manually).
+
 **App fails to start with `failed to open database`**
 
 GoPad cannot create `~/.local/share/gopad/`. Check that your home directory is writable. As a fallback it will attempt to write `notes.db` in the current working directory.
