@@ -369,8 +369,16 @@ body.no-linenums #line-numbers{display:none}
 #preview-pane strong{color:var(--text-bright)}
 #preview-pane code{font-family:var(--font-mono);font-size:.9em;background:var(--surface);padding:.15em .35em}
 #preview-pane pre{background:var(--surface);border:1px solid var(--border);padding:12px 14px;overflow-x:auto;margin:.8em 0}
-#preview-pane pre.mermaid{position:relative;text-align:center}
-#preview-pane pre.mermaid svg{max-width:100%;height:auto}
+/* overflow:auto + a bounded height turns the diagram into a real pannable
+   viewport instead of just growing the whole preview pane when zoomed in;
+   left-anchored (no text-align:center) so scrollLeft/scrollTop from (0,0)
+   can always reach every part of it, not just whatever overflows one side. */
+#preview-pane pre.mermaid{
+  position:relative;overflow:auto;max-height:min(60vh,520px);
+  cursor:grab;touch-action:none;
+}
+#preview-pane pre.mermaid.grabbing{cursor:grabbing}
+#preview-pane pre.mermaid svg{display:block;max-width:100%;height:auto;pointer-events:none}
 #preview-pane .mermaid-zoom{
   position:absolute;top:6px;right:6px;z-index:2;display:flex;align-items:center;gap:1px;
   background:var(--bg-bar);border:1px solid var(--border);padding:2px;
@@ -382,7 +390,8 @@ body.no-linenums #line-numbers{display:none}
 }
 #preview-pane .mermaid-zoom button:hover{background:var(--hover);color:var(--accent)}
 #preview-pane .mermaid-zoom .mz-pct{
-  font-family:var(--font-mono);font-size:10px;color:var(--text-dim);min-width:32px;text-align:center;
+  width:auto;min-width:32px;padding:0 4px;font-weight:400;
+  font-family:var(--font-mono);font-size:10px;color:var(--text-dim);
 }
 #preview-pane pre code{background:none;padding:0}
 #preview-pane blockquote{border-left:3px solid var(--accent);padding:.1em 1em;margin:.8em 0;color:var(--text-dim)}
@@ -1923,8 +1932,8 @@ function addMermaidZoom(pre){
   const naturalWidth = svg.getBoundingClientRect().width || 300;
   svg.style.maxWidth = 'none';
   let scale = 1;
-  const pct = document.createElement('span');
-  pct.className = 'mz-pct';
+  const pct = document.createElement('button');
+  pct.type = 'button'; pct.className = 'mz-pct'; pct.title = 'Reset zoom & position';
   const apply = ()=>{ svg.style.width = Math.round(naturalWidth*scale)+'px'; pct.textContent = Math.round(scale*100)+'%'; };
   const mkBtn = (label, title, fn)=>{
     const b=document.createElement('button');
@@ -1935,10 +1944,32 @@ function addMermaidZoom(pre){
   const zoom = document.createElement('div');
   zoom.className = 'mermaid-zoom';
   zoom.appendChild(mkBtn('−','Zoom out',()=>{ scale=Math.max(0.4,+(scale-0.2).toFixed(2)); apply(); }));
+  pct.addEventListener('click', e=>{ e.stopPropagation(); scale=1; apply(); pre.scrollLeft=0; pre.scrollTop=0; });
   zoom.appendChild(pct);
   zoom.appendChild(mkBtn('+','Zoom in',()=>{ scale=Math.min(3,+(scale+0.2).toFixed(2)); apply(); }));
   pre.insertBefore(zoom, pre.firstChild);
   apply();
+
+  // Drag to pan — the diagram can be bigger than its frame (zoomed in, or
+  // just a large diagram), and scrollbars alone aren't a discoverable way to
+  // explore it, so grab-and-drag scrolls the frame directly.
+  let panning=false, startX=0, startY=0, startLeft=0, startTop=0;
+  pre.addEventListener('pointerdown', e=>{
+    if(e.target.closest('.mermaid-zoom')) return;
+    panning=true;
+    startX=e.clientX; startY=e.clientY;
+    startLeft=pre.scrollLeft; startTop=pre.scrollTop;
+    pre.classList.add('grabbing');
+    pre.setPointerCapture(e.pointerId);
+  });
+  pre.addEventListener('pointermove', e=>{
+    if(!panning) return;
+    pre.scrollLeft = startLeft - (e.clientX-startX);
+    pre.scrollTop = startTop - (e.clientY-startY);
+  });
+  const endPan = ()=>{ panning=false; pre.classList.remove('grabbing'); };
+  pre.addEventListener('pointerup', endPan);
+  pre.addEventListener('pointercancel', endPan);
 }
 
 // Picker
