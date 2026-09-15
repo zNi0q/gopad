@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/microcosm-cc/bluemonday"
@@ -23,14 +25,18 @@ import (
 // mdPolicy sanitizes the rendered HTML before it reaches the WebView. Goldmark
 // already drops raw HTML and dangerous URLs by default, but unlike a browser
 // tab this WebView has the Go bridge bound onto window.go.main.App, so the
-// output still gets an independent allow-list pass. gopadfile is our own
-// scheme for relative links to another file in an open folder (see
-// relativeRefResolver below); data-URI images are needed for embedded local
-// images, since the WebView has no filesystem access of its own.
+// output still gets an independent allow-list pass. data-URI images are
+// needed for embedded local images, since the WebView has no filesystem
+// access of its own. Relative markdown links are deliberately left as plain,
+// unrewritten hrefs — see ResolveWorkspacePath for why and how the preview's
+// click handler follows them. The narrow class allow-list on <code> is how
+// the frontend recognizes a ```mermaid fence to hand off to mermaid.js —
+// goldmark already emits "language-mermaid" there by default, bluemonday
+// would otherwise strip it (class isn't in UGCPolicy's baseline).
 var mdPolicy = func() *bluemonday.Policy {
 	p := bluemonday.UGCPolicy()
 	p.AllowDataURIImages()
-	p.AllowURLSchemes("gopadfile")
+	p.AllowAttrs("class").Matching(regexp.MustCompile(`^language-[a-zA-Z0-9_-]+$`)).OnElements("code")
 	return p
 }()
 
@@ -53,12 +59,10 @@ func (a *App) RenderMarkdown(content, basePath string) (string, error) {
 	return mdPolicy.Sanitize(buf.String()), nil
 }
 
-// relativeRefResolver rewrites relative image/link destinations so they still
-// work inside the preview: images are inlined as data URIs, and links to
-// another file under base get a gopadfile:// destination that the preview's
-// click handler resolves back to a real path and opens in the folder
-// workspace. Anything outside base, or with a scheme of its own (http,
-// mailto, data, …), is left untouched.
+// relativeRefResolver inlines relative image references as data URIs so they
+// actually display (the WebView has no filesystem access of its own). Link
+// destinations are deliberately left untouched here — see
+// ResolveWorkspacePath.
 type relativeRefResolver struct{ base string }
 
 func (r *relativeRefResolver) Transform(doc *ast.Document, _ text.Reader, _ parser.Context) {
@@ -69,20 +73,33 @@ func (r *relativeRefResolver) Transform(doc *ast.Document, _ text.Reader, _ pars
 		if !entering {
 			return ast.WalkContinue, nil
 		}
-		switch node := n.(type) {
-		case *ast.Image:
+		if node, ok := n.(*ast.Image); ok {
 			if abs, ok := resolveWithinBase(r.base, string(node.Destination)); ok {
 				if dataURI, ok := embedImageDataURI(abs); ok {
 					node.Destination = []byte(dataURI)
 				}
 			}
-		case *ast.Link:
-			if abs, ok := resolveWithinBase(r.base, string(node.Destination)); ok {
-				node.Destination = []byte((&url.URL{Scheme: "gopadfile", Path: abs}).String())
-			}
 		}
 		return ast.WalkContinue, nil
 	})
+}
+
+// ResolveWorkspacePath resolves a markdown link's raw href against basePath
+// and confirms it doesn't escape it. Unlike images, link destinations are
+// never rewritten at render time (see relativeRefResolver) — rewriting them
+// to a custom URL scheme would mean the sanitizer could no longer tell a
+// legitimately-relative link from one an attacker hand-typed to look the
+// same (e.g. a crafted link straight to a sensitive file), since by the time
+// bluemonday sees the HTML both look identical. Re-resolving fresh here, at
+// the moment the preview's click handler actually follows the link, closes
+// that gap: only a destination that genuinely resolves inside basePath ever
+// reaches openFolderFile / ReadDiskFile.
+func (a *App) ResolveWorkspacePath(basePath, dest string) (string, error) {
+	abs, ok := resolveWithinBase(basePath, dest)
+	if !ok {
+		return "", fmt.Errorf("%q does not resolve to a file inside the open folder", dest)
+	}
+	return abs, nil
 }
 
 // resolveWithinBase resolves a markdown-relative destination against base and
@@ -102,6 +119,18 @@ func resolveWithinBase(base, dest string) (string, bool) {
 	baseClean := filepath.Clean(base)
 	if abs != baseClean && !strings.HasPrefix(abs, baseClean+string(filepath.Separator)) {
 		return "", false
+	}
+	// The lexical check above doesn't see through symlinks — a symlink inside
+	// the folder root could otherwise point outside it and still pass. Resolve
+	// both sides and re-check whenever the target actually exists; a target
+	// that doesn't exist can't leak anything (the caller's Stat/ReadFile will
+	// just fail on it), so that case is left to the lexical result above.
+	if baseReal, err := filepath.EvalSymlinks(baseClean); err == nil {
+		if absReal, err := filepath.EvalSymlinks(abs); err == nil {
+			if absReal != baseReal && !strings.HasPrefix(absReal, baseReal+string(filepath.Separator)) {
+				return "", false
+			}
+		}
 	}
 	return abs, true
 }

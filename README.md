@@ -56,7 +56,10 @@ The UI is HTML/CSS/JS rendered by **WebKitGTK** (the same engine behind GNOME We
 | **Locking** | Lock a note with a passphrase — its content is encrypted at rest (scrypt + AES-256-GCM) and stays unreadable until the passphrase is entered; the key is dropped as soon as you switch notes |
 | **Search** | Live full-text sidebar search across title and content |
 | **Find & Replace** | In-editor search with match counter (`3/17`), cycle prev/next, replace one or all |
-| **File I/O** | Open any text/code file from disk; export/save back via the native Wails file dialog |
+| **File I/O** | Open any text/code file from disk; export/save back via the native Wails file dialog; drag a file or folder onto the window to import it or open it as a workspace |
+| **Markdown preview** | Toggle button renders the active note/file as sanitized HTML (GFM tables, task lists, strikethrough); ` ```mermaid ` fences render as diagrams |
+| **Safe Mode** | Header toggle — off, New Note creates a temporary note that lives in memory only and disappears when GoPad closes, instead of the default durable DB note |
+| **Folder workspace** | Open a real directory as a lazy-loading file tree in its own sidebar tab; edit files in place, autosaving straight to disk |
 | **Line numbers** | Rendered in a synced sibling div — scroll-locked to the textarea at all times |
 | **Editor** | Monospace font stack, `Tab` → 4 spaces, configurable font size (10–36 px), word wrap toggle |
 | **Themes** | Dark (default) and light; selection persisted to the `settings` table |
@@ -306,8 +309,16 @@ Each exported `App` method is bound by Wails as `window.go.main.App.<Method>()`,
 | `App.Version()` | — | Version stamped at build time |
 | `App.SaveToFile(id)` | Wails dialog → `os.WriteFile` | Export content to a user-chosen path |
 | `App.OpenFile()` | Wails dialog → `os.ReadFile` | Import file into a new note |
+| `App.ImportFile(path)` | `importFile` | Same as `OpenFile`, given a path directly — used by drag-and-drop |
+| `App.ExportContent(name, content)` | Wails dialog → `os.WriteFile` | Save content that has no DB row (a temporary note) to a chosen path |
 | `App.GetSetting(key)` | `dbGetSetting` | Read one setting value |
 | `App.SetSetting(key, value)` | `dbSetSetting` | Upsert one setting value |
+| `App.RenderMarkdown(content, basePath)` | goldmark → bluemonday | Sanitized HTML for the preview pane; `basePath` resolves relative image/link references when previewing a folder-workspace file |
+| `App.ResolveWorkspacePath(basePath, dest)` | `resolveWithinBase` | Confirms a clicked preview link resolves inside `basePath` before the frontend opens it |
+| `App.PickFolder()` | Wails directory dialog | Choose a folder to open as a workspace |
+| `App.ListDir(path)` | `os.ReadDir` | One level of a folder-workspace tree |
+| `App.ReadDiskFile(path)` / `App.WriteDiskFile(path, content)` | `os.ReadFile` / `os.WriteFile` | Read/save a folder-workspace file directly, no DB row |
+| `App.IsDir(path)` | `os.Stat` | Routes a dropped path to folder-open vs file-import |
 
 ---
 
@@ -317,6 +328,9 @@ Each exported `App` method is bound by Wails as `window.go.main.App.<Method>()`,
 |---|---|---|---|
 | [`github.com/wailsapp/wails/v2`](https://github.com/wailsapp/wails) | `v2.12.0` | MIT | WebKitGTK window, JS bindings, native dialogs |
 | [`github.com/mattn/go-sqlite3`](https://github.com/mattn/go-sqlite3) | `v1.14.45` | MIT | SQLite driver (CGO) |
+| [`github.com/yuin/goldmark`](https://github.com/yuin/goldmark) | `v1.8.6` | MIT | Markdown → HTML for the preview pane |
+| [`github.com/microcosm-cc/bluemonday`](https://github.com/microcosm-cc/bluemonday) | `v1.0.27` | BSD-3-Clause | Sanitizes rendered markdown HTML before it reaches the WebView |
+| [`mermaid`](https://github.com/mermaid-js/mermaid) | `11.4.1` | MIT | Vendored at `frontend/dist/assets/mermaid.min.js` (see its `mermaid.LICENSE.txt`) — renders ` ```mermaid ` fences in the preview. No CDN: the app has no network access at runtime, so the bundle ships inside the embedded frontend. |
 
 System libraries (not vendored): `libwebkit2gtk-4.1`, `libgtk-3`, `libsqlite3`.
 

@@ -369,6 +369,21 @@ body.no-linenums #line-numbers{display:none}
 #preview-pane strong{color:var(--text-bright)}
 #preview-pane code{font-family:var(--font-mono);font-size:.9em;background:var(--surface);padding:.15em .35em}
 #preview-pane pre{background:var(--surface);border:1px solid var(--border);padding:12px 14px;overflow-x:auto;margin:.8em 0}
+#preview-pane pre.mermaid{position:relative;text-align:center}
+#preview-pane pre.mermaid svg{max-width:100%;height:auto}
+#preview-pane .mermaid-zoom{
+  position:absolute;top:6px;right:6px;z-index:2;display:flex;align-items:center;gap:1px;
+  background:var(--bg-bar);border:1px solid var(--border);padding:2px;
+}
+#preview-pane .mermaid-zoom button{
+  background:none;border:none;color:var(--text-dim);cursor:pointer;
+  width:20px;height:20px;font-size:13px;font-weight:700;font-family:var(--font-ui);line-height:1;
+  display:flex;align-items:center;justify-content:center;
+}
+#preview-pane .mermaid-zoom button:hover{background:var(--hover);color:var(--accent)}
+#preview-pane .mermaid-zoom .mz-pct{
+  font-family:var(--font-mono);font-size:10px;color:var(--text-dim);min-width:32px;text-align:center;
+}
 #preview-pane pre code{background:none;padding:0}
 #preview-pane blockquote{border-left:3px solid var(--accent);padding:.1em 1em;margin:.8em 0;color:var(--text-dim)}
 #preview-pane table{border-collapse:collapse;margin:.8em 0;font-size:.95em}
@@ -973,6 +988,10 @@ mark.hl-orange{background:rgba(255,150,50,.30)}
   </div>
 </div>
 
+<!-- Vendored (MIT, see assets/mermaid.LICENSE.txt) — the app has no network
+     access at runtime, so Mermaid ships inside the embedded frontend rather
+     than loading from a CDN. Sets a plain window.mermaid global. -->
+<script src="assets/mermaid.min.js"></script>
 <script>
 'use strict';
 
@@ -1031,6 +1050,9 @@ const HB=q('heartbeat'), HBL=q('hb-label');
 
 // ── Utils ───────────────────────────────────────────────────────────────────
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// basename splits on both separators — native paths from the Go/Wails side
+// are backslash-separated on Windows, forward-slash everywhere else.
+function basename(path){ return String(path).split(/[\\/]/).pop(); }
 
 let toastTimer;
 function toast(msg,ms=2200){
@@ -1418,7 +1440,7 @@ async function openFolderFile(path){
   S.activeId=null;
   S.activeFilePathWS=path;
   const title=q('note-title');
-  title.value=path.split('/').pop();
+  title.value=basename(path);
   title.readOnly=true; title.classList.add('locked');
   ED.value=content;
   UndoMgr.init();
@@ -1490,7 +1512,8 @@ async function toggleArchive(id=S.activeId){
   renderList(q('search-inp').value);
   if(wasActive){
     await closeActiveNote();
-    if(S.notes.length) await openNote(S.notes[0].id);
+    const remaining=visibleNotes();
+    if(remaining.length) await openNote(remaining[0].id);
   }
   toast(restoring?'Note restored':'Note archived');
 }
@@ -1622,7 +1645,7 @@ function updateStatus(){
   q('st-words').textContent=`${txt.trim()?txt.trim().split(/\s+/).length:0} words`;
   q('st-chars').textContent=`${txt.length} chars`;
 }
-function updateFileTag(path){ q('st-file').textContent=path?'↪ '+path.split('/').pop():''; }
+function updateFileTag(path){ q('st-file').textContent=path?'↪ '+basename(path):''; }
 
 // ── Editor events ───────────────────────────────────────────────────────────
 ED.addEventListener('input',()=>{ UndoMgr.record(); updateLineNumbers(); updateStatus(); scheduleSave(); renderHlOverlay(); });
@@ -1854,7 +1877,60 @@ async function renderPreview(){
   let html = '';
   try{ html = await App().RenderMarkdown(ED.value, basePath||''); }
   catch(e){ html = '<p style="color:var(--danger)">Couldn’t render preview.</p>'; }
-  if(S.previewOn && S.activeId===noteId && S.activeFilePathWS===filePath) PV.innerHTML = html;
+  if(S.previewOn && S.activeId===noteId && S.activeFilePathWS===filePath){
+    PV.innerHTML = html;
+    await renderMermaidBlocks();
+  }
+}
+
+// renderMermaidBlocks swaps each ```mermaid fence (rendered by goldmark as
+// <pre><code class="language-mermaid">…</code></pre> — see mdPolicy in
+// markdown.go for why that class survives sanitization) for a diagram via
+// the vendored mermaid.js. Missing/failed mermaid, or a diagram with bad
+// syntax, degrades to leaving the block as plain text rather than breaking
+// the rest of the preview.
+function renderMermaidBlocks(){
+  const codes = PV.querySelectorAll('code.language-mermaid');
+  if(!codes.length || typeof mermaid==='undefined') return Promise.resolve();
+  mermaid.initialize({startOnLoad:false, securityLevel:'strict', theme:S.theme==='light'?'default':'dark'});
+  codes.forEach(code=>{
+    const pre=document.createElement('pre');
+    pre.className='mermaid';
+    pre.textContent=code.textContent;
+    (code.closest('pre')||code).replaceWith(pre);
+  });
+  return mermaid.run({nodes:PV.querySelectorAll('pre.mermaid'), suppressErrors:true})
+    .then(()=>{ PV.querySelectorAll('pre.mermaid').forEach(addMermaidZoom); })
+    .catch(()=>{});
+}
+
+// addMermaidZoom fits a +/−/reset control into the corner of a rendered
+// diagram. Zooming resizes the SVG's own width (not a CSS transform, which
+// would leave the scrollable area — inherited from #preview-pane pre's
+// overflow-x:auto — the wrong size and clip anything past 100%).
+function addMermaidZoom(pre){
+  const svg = pre.querySelector('svg');
+  if(!svg || pre.dataset.zoomReady) return;
+  pre.dataset.zoomReady='1';
+  const naturalWidth = svg.getBoundingClientRect().width || 300;
+  svg.style.maxWidth = 'none';
+  let scale = 1;
+  const pct = document.createElement('span');
+  pct.className = 'mz-pct';
+  const apply = ()=>{ svg.style.width = Math.round(naturalWidth*scale)+'px'; pct.textContent = Math.round(scale*100)+'%'; };
+  const mkBtn = (label, title, fn)=>{
+    const b=document.createElement('button');
+    b.type='button'; b.textContent=label; b.title=title;
+    b.addEventListener('click', e=>{ e.stopPropagation(); fn(); });
+    return b;
+  };
+  const zoom = document.createElement('div');
+  zoom.className = 'mermaid-zoom';
+  zoom.appendChild(mkBtn('−','Zoom out',()=>{ scale=Math.max(0.4,+(scale-0.2).toFixed(2)); apply(); }));
+  zoom.appendChild(pct);
+  zoom.appendChild(mkBtn('+','Zoom in',()=>{ scale=Math.min(3,+(scale+0.2).toFixed(2)); apply(); }));
+  pre.insertBefore(zoom, pre.firstChild);
+  apply();
 }
 
 // Picker
@@ -1918,20 +1994,21 @@ q('btn-preview').addEventListener('click', togglePreview);
 // Links inside the preview are plain <a href> tags rendered from note content.
 // Left unhandled, clicking one navigates the WebView itself away from the app
 // (the whole window goes blank, loading the target in place of the SPA) — so
-// send http(s)/mailto links to the system browser, hand a gopadfile:// link
-// (RenderMarkdown's rewrite of a relative link to another file in the open
-// folder — see markdown.go) to the folder-workspace editor, and swallow the rest.
+// send http(s)/mailto links to the system browser. Anything else is only
+// followed when we're in a folder workspace: the raw href is re-resolved
+// fresh against the open folder's root via App().ResolveWorkspacePath (see
+// markdown.go), which is the sole authority on whether it points inside that
+// folder — the href itself is never trusted, since a crafted link left as
+// plain relative-looking text would otherwise be indistinguishable from a
+// legitimate one.
 PV.addEventListener('click', e=>{
   const a = e.target.closest('a[href]');
   if(!a) return;
   e.preventDefault();
   const href = a.getAttribute('href') || '';
   if(/^(https?:|mailto:)/i.test(href)){ window.runtime.BrowserOpenURL(href); return; }
-  if(href.startsWith('gopadfile://')){
-    let path;
-    try{ path=decodeURIComponent(new URL(href).pathname); }catch(e){ return; }
-    openFolderFile(path);
-  }
+  if(!S.folderPath) return;
+  App().ResolveWorkspacePath(S.folderPath, href).then(path=>{ if(path) openFolderFile(path); }).catch(()=>{});
 });
 q('hl-panel-close').addEventListener('click', ()=>{
   q('hl-panel').classList.remove('show'); q('btn-hl-panel').classList.remove('active');
@@ -2064,7 +2141,11 @@ async function saveToFile(){
     let path;
     try{ path=await App().ExportContent(title,ED.value); }
     catch(e){ toast('Export failed'); return; }
-    if(path) toast('Exported → '+path.split('/').pop());
+    if(path){
+      const n=S.ephemeralNotes.find(x=>x.id===S.activeId);
+      if(n) n.file_path=path;
+      updateFileTag(path); toast('Exported → '+basename(path));
+    }
     return;
   }
   let path;
@@ -2074,10 +2155,12 @@ async function saveToFile(){
   if(path){
     const idx=S.notes.findIndex(n=>n.id===S.activeId);
     if(idx>=0) S.notes[idx].file_path=path;
-    updateFileTag(path); toast('Exported → '+path.split('/').pop());
+    updateFileTag(path); toast('Exported → '+basename(path));
   }
 }
 async function openFile(){
+  clearTimeout(S.saveTimer);
+  await flushSave(); // don't abandon a pending disk/DB write for the note we're leaving
   let n;
   try{ n=await App().OpenFile(); }
   catch(e){ toast('Open failed'); return; }
@@ -2096,6 +2179,8 @@ async function openFile(){
 // file…" does — always durable, since a dropped file already exists
 // permanently on disk regardless of Safe Mode.
 async function importDroppedFiles(paths){
+  clearTimeout(S.saveTimer);
+  await flushSave(); // don't abandon a pending disk/DB write for the note we're leaving
   let lastNote=null, failed=0;
   for(const p of paths){
     try{ lastNote=await App().ImportFile(p); }
@@ -2203,12 +2288,18 @@ window.addEventListener('dragleave',e=>{ if(isFileDrag(e)){ dragDepth=Math.max(0
 window.addEventListener('drop',e=>{ if(isFileDrag(e)) e.preventDefault(); dragDepth=0; document.body.classList.remove('dropping'); });
 async function onFilesDropped(x,y,paths){
   if(!paths || !paths.length) return;
-  if(paths.length===1){
+  // Sort dropped paths into folders vs files — GoPad only has one folder
+  // workspace open at a time, so the first dropped folder wins; every other
+  // path (folder or file) is imported as a note.
+  const dirs=[], files=[];
+  for(const p of paths){
     let isDir=false;
-    try{ isDir=await App().IsDir(paths[0]); }catch(e){}
-    if(isDir){ await openFolderPath(paths[0]); toast('Opened folder'); return; }
+    try{ isDir=await App().IsDir(p); }catch(e){}
+    (isDir?dirs:files).push(p);
   }
-  await importDroppedFiles(paths);
+  if(dirs.length){ await openFolderPath(dirs[0]); toast('Opened folder'); }
+  if(files.length) await importDroppedFiles(files);
+  if(dirs.length>1) toast(`Opened ${basename(dirs[0])} — only one folder can be open at a time`);
 }
 q('sb-toggle').addEventListener('click',toggleSidebar);
 q('theme-btn').addEventListener('click',toggleThemeAnimated);
