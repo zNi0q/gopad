@@ -29,6 +29,11 @@ func main() {
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		Bind:             []interface{}{app},
+		// Gives the frontend real filesystem paths for dropped files/folders
+		// (window.runtime.OnFileDrop), instead of the browser's sandboxed File API.
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop: true,
+		},
 		Linux: &linux.Options{
 			ProgramName: "GoPad",
 		},
