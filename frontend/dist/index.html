@@ -346,6 +346,37 @@ body.no-linenums #line-numbers{display:none}
 }
 #editor::selection{background:var(--sel)}
 #editor.locked{color:var(--text-dim)}
+
+/* ── Markdown preview ─────────────────────────────────────────────────────*/
+#preview-pane{
+  flex:1;display:none;overflow:auto;position:relative;
+  padding:18px 28px;font-family:var(--font-ui);font-size:var(--fs);line-height:var(--lh);
+  color:var(--text);-webkit-user-select:text;user-select:text;
+}
+#preview-pane.show{display:block;animation:fadein .16s ease}
+#preview-pane>*:first-child{margin-top:0}
+#preview-pane h1,#preview-pane h2,#preview-pane h3,#preview-pane h4,#preview-pane h5,#preview-pane h6{
+  color:var(--text-bright);font-weight:600;margin:1.2em 0 .5em;line-height:1.3;
+}
+#preview-pane h1{font-size:1.7em;border-bottom:1px solid var(--border);padding-bottom:.3em}
+#preview-pane h2{font-size:1.4em;border-bottom:1px solid var(--border);padding-bottom:.25em}
+#preview-pane h3{font-size:1.2em}
+#preview-pane p{margin:.7em 0}
+#preview-pane ul,#preview-pane ol{margin:.5em 0 .5em 1.4em}
+#preview-pane li{margin:.2em 0}
+#preview-pane li>p{margin:.2em 0}
+#preview-pane a{color:var(--accent)}
+#preview-pane strong{color:var(--text-bright)}
+#preview-pane code{font-family:var(--font-mono);font-size:.9em;background:var(--surface);padding:.15em .35em}
+#preview-pane pre{background:var(--surface);border:1px solid var(--border);padding:12px 14px;overflow-x:auto;margin:.8em 0}
+#preview-pane pre code{background:none;padding:0}
+#preview-pane blockquote{border-left:3px solid var(--accent);padding:.1em 1em;margin:.8em 0;color:var(--text-dim)}
+#preview-pane table{border-collapse:collapse;margin:.8em 0;font-size:.95em}
+#preview-pane th,#preview-pane td{border:1px solid var(--border);padding:5px 10px;text-align:left}
+#preview-pane th{background:var(--surface)}
+#preview-pane img{max-width:100%}
+#preview-pane hr{border:none;border-top:1px solid var(--border);margin:1.2em 0}
+#preview-pane input[type=checkbox]{margin-right:.4em}
 /* ── Find bar ─────────────────────────────────────────────────────────────*/
 #find-bar{
   background:var(--bg-bar);border-top:1px solid var(--border);
@@ -384,6 +415,7 @@ body.no-linenums #line-numbers{display:none}
 }
 #heartbeat.writing .hb-dot{background:var(--accent);animation:breathe 1s ease-in-out infinite}
 #heartbeat.failed  .hb-dot{background:var(--danger)}
+#heartbeat.temp    .hb-dot{background:var(--accent);box-shadow:none}
 #heartbeat.pulse   .hb-dot{animation:pulse .6s ease-out}
 @keyframes pulse{
   0%{box-shadow:0 0 0 0 rgba(76,195,138,.55)}
@@ -478,6 +510,42 @@ body.no-linenums #line-numbers{display:none}
   animation:pilldot 2s ease-in-out infinite;
 }
 @keyframes pilldot{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── Safe Mode pill ───────────────────────────────────────────────────────*/
+#safemode-btn{
+  display:flex;align-items:center;gap:6px;margin-right:6px;
+  background:none;color:var(--text-dim);border:1px solid var(--border);
+  border-radius:999px;padding:4px 11px 4px 9px;cursor:pointer;
+  font-family:var(--font-ui);font-size:11.5px;font-weight:600;
+  transition:filter .13s,transform .1s,background .13s,color .13s,border-color .13s;
+}
+#safemode-btn:hover{filter:brightness(1.12)}
+#safemode-btn:active{transform:scale(.95)}
+#safemode-btn .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);flex-shrink:0}
+#safemode-btn.off{background:rgba(229,87,63,.12);color:var(--danger);border-color:transparent}
+#safemode-btn.off .dot{background:var(--danger)}
+
+/* ── Drag & drop overlay ──────────────────────────────────────────────────*/
+body.dropping::after{
+  content:'Drop to open — files become notes, folders open as a workspace';
+  position:fixed;inset:0;z-index:5000;
+  display:flex;align-items:center;justify-content:center;text-align:center;padding:40px;
+  background:rgba(15,20,25,.72);color:var(--text-bright);
+  font-family:var(--font-ui);font-size:15px;font-weight:600;
+  border:3px dashed var(--accent);pointer-events:none;
+}
+
+/* ── Folder-workspace tree ───────────────────────────────────────────────*/
+.fti{
+  display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:8px;
+  font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:background .12s;
+}
+.fti:hover{background:var(--hover)}
+.fti.active{background:var(--surface);color:var(--text-bright)}
+.fti.dir{color:var(--text-dim);font-weight:600}
+.fti-chev{width:11px;flex-shrink:0;font-size:10px;color:var(--text-dim)}
+.fti-name{overflow:hidden;text-overflow:ellipsis}
 #upd-notes{
   max-height:190px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);
   border-radius:8px;padding:11px 13px;margin-bottom:16px;
@@ -613,6 +681,7 @@ mark.hl-orange{background:rgba(255,150,50,.30)}
         <div class="menu-pop">
           <button class="menu-item" data-act="new">New note<span class="menu-key">Ctrl+N</span></button>
           <button class="menu-item" data-act="open">Open file…<span class="menu-key">Ctrl+O</span></button>
+          <button class="menu-item" data-act="openfolder">Open folder…</button>
           <button class="menu-item" data-act="export">Export to file…<span class="menu-key">Ctrl+S</span></button>
           <div class="menu-div"></div>
           <button class="menu-item" data-act="archive" id="mi-archive">Archive note</button>
@@ -634,6 +703,7 @@ mark.hl-orange{background:rgba(255,150,50,.30)}
         <div class="menu-pop">
           <button class="menu-item" data-act="wrap">Toggle word wrap</button>
           <button class="menu-item" data-act="linenums" id="mi-linenums">Hide line numbers</button>
+          <button class="menu-item" data-act="preview" id="mi-preview">Show preview</button>
           <div class="menu-div"></div>
           <button class="menu-item" data-act="finc">Zoom in<span class="menu-key">Ctrl +</span></button>
           <button class="menu-item" data-act="fdec">Zoom out<span class="menu-key">Ctrl −</span></button>
@@ -651,6 +721,9 @@ mark.hl-orange{background:rgba(255,150,50,.30)}
 
     <!-- Quick-access bar -->
     <div class="qbar" id="qbar">
+      <button id="safemode-btn" title="Safe Mode is on — new notes are saved to disk and survive restarts. Click to make new notes temporary instead.">
+        <span class="dot"></span><span id="safemode-label">Safe mode</span>
+      </button>
       <button id="update-pill" title="A new version of GoPad is ready to install">
         <span class="dot"></span><span id="update-pill-label">Update available</span>
       </button>
@@ -701,6 +774,7 @@ mark.hl-orange{background:rgba(255,150,50,.30)}
       <div class="sb-tabs" role="tablist" aria-label="Note folders">
         <button class="sb-tab active" id="tab-notes" data-view="notes" role="tab" aria-selected="true">Notes</button>
         <button class="sb-tab" id="tab-archive" data-view="archive" role="tab" aria-selected="false">Archive</button>
+        <button class="sb-tab" id="tab-folder" data-view="folder" role="tab" aria-selected="false">Folder</button>
       </div>
       <div id="notes-list"></div>
     </div>
@@ -718,6 +792,13 @@ mark.hl-orange{background:rgba(255,150,50,.30)}
             <line x1="3" y1="21" x2="21" y2="21"/>
           </svg>
           Highlights
+        </button>
+        <button class="tb-btn" id="btn-preview" title="Preview">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          Preview
         </button>
       </div>
 
@@ -748,6 +829,8 @@ mark.hl-orange{background:rgba(255,150,50,.30)}
           </div>
           <div id="smooth-caret"></div>
         </div>
+
+        <div id="preview-pane"></div>
 
         <!-- Highlights panel -->
         <div id="hl-panel">
@@ -907,6 +990,14 @@ const S = {
   activeLocked:false, activeRevealed:false,
   fontSize:DEFAULT_FONT, wordWrap:true, theme:'dark', sbCollapsed:false, lineNums:true,
   findMatches:[], findIdx:0, confirmCb:null,
+  previewOn:false,
+  // Safe Mode: whether newNote() creates a durable DB note (true, default) or a
+  // temporary in-memory-only one (false) — see ephemeralNotes below.
+  safeMode:true, ephemeralNotes:[], ephCounter:0,
+  // Folder workspace: a real directory browsed/edited straight off disk,
+  // independent of the SQLite notes list. activeFilePathWS is the open file's
+  // path, mutually exclusive with activeId.
+  folderPath:null, folderExpanded:new Set(), folderChildren:new Map(), activeFilePathWS:null,
 };
 
 // ── Undo manager ────────────────────────────────────────────────────────────
@@ -935,7 +1026,7 @@ const UndoMgr = {
 
 // ── DOM ─────────────────────────────────────────────────────────────────────
 const q=id=>document.getElementById(id);
-const ED=q('editor'), LN=q('line-numbers'), EP=q('editor-pane'), ES=q('empty-state'), FB=q('find-bar');
+const ED=q('editor'), LN=q('line-numbers'), EP=q('editor-pane'), ES=q('empty-state'), FB=q('find-bar'), PV=q('preview-pane');
 const HB=q('heartbeat'), HBL=q('hb-label');
 
 // ── Utils ───────────────────────────────────────────────────────────────────
@@ -1021,6 +1112,9 @@ function hbSafe(){
   HB.classList.remove('pulse'); void HB.offsetWidth; HB.classList.add('pulse');
 }
 function hbFailed(){ HB.classList.remove('writing','pulse'); HB.classList.add('failed'); HBL.textContent='Save failed'; }
+// hbTemp marks the heartbeat as "not actually durable" — Safe Mode is off, so
+// this note lives in memory only and disappears when GoPad closes.
+function hbTemp(){ HB.classList.remove('writing','failed','pulse'); HB.classList.add('temp'); HBL.textContent='Temporary'; }
 
 // ── Notes list ──────────────────────────────────────────────────────────────
 async function loadNotes(){
@@ -1031,19 +1125,38 @@ async function loadNotes(){
   catch(e){ toast('Couldn’t load notes'); }
 }
 
-function renderList(filter=''){
-  const nl=q('notes-list'); nl.innerHTML='';
-  const f=filter.toLowerCase();
-  const visible=f ? S.notes.filter(n=>(n.title||'').toLowerCase().includes(f)||(n.content||'').toLowerCase().includes(f)) : S.notes;
-  q('sb-count').textContent=S.notes.length;
-  q('sb-label').textContent=S.view==='archive'?'Archive':'Notes';
+// visibleNotes merges this session's temporary (Safe Mode off) notes into the
+// Notes tab. They never touch the DB, so they'd otherwise vanish every time
+// loadNotes() refreshes S.notes from a fresh App().ListNotes() fetch.
+function visibleNotes(){
+  if(S.view!=='notes') return S.notes;
+  return [...S.ephemeralNotes,...S.notes].sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
+}
+
+// syncViewChrome reflects the active sidebar tab (notes/archive/folder) in the
+// tab strip, header label, search box, and the File-menu archive label.
+function syncViewChrome(){
+  ['notes','archive','folder'].forEach(v=>{
+    const el=q('tab-'+v), active=S.view===v;
+    el.classList.toggle('active',active);
+    el.setAttribute('aria-selected',active?'true':'false');
+  });
+  const inFolder=S.view==='folder';
+  q('sb-search').style.display=inFolder?'none':'';
+  q('sb-count').style.display=inFolder?'none':'';
+  q('sb-label').textContent=S.view==='archive'?'Archive':(inFolder?'Folder':'Notes');
   q('search-inp').placeholder=S.view==='archive'?'Search archive…':'Search notes…';
-  q('tab-notes').classList.toggle('active',S.view==='notes');
-  q('tab-archive').classList.toggle('active',S.view==='archive');
-  q('tab-notes').setAttribute('aria-selected',S.view==='notes'?'true':'false');
-  q('tab-archive').setAttribute('aria-selected',S.view==='archive'?'true':'false');
   q('mi-archive').textContent=S.view==='archive'?'Restore note':'Archive note';
   syncLockMenu();
+}
+
+function renderList(filter=''){
+  syncViewChrome();
+  const nl=q('notes-list'); nl.innerHTML='';
+  const f=filter.toLowerCase();
+  const all=visibleNotes();
+  const visible=f ? all.filter(n=>(n.title||'').toLowerCase().includes(f)||(n.content||'').toLowerCase().includes(f)) : all;
+  q('sb-count').textContent=all.length;
 
   if(!visible.length){
     const empty=S.view==='archive'?'Archive is empty.':'No notes yet.<br>Press Ctrl+N to start.';
@@ -1057,33 +1170,50 @@ function renderList(filter=''){
     el.innerHTML=`
       <div class="ni-info">
         <div class="ni-title">${esc(n.title||'Untitled')}</div>
-        <div class="ni-date">${fmtDate(n.updated_at)}${n.locked?' · Locked':''}</div>
+        <div class="ni-date">${fmtDate(n.updated_at)}${n.locked?' · Locked':''}${n.ephemeral?' · Temporary':''}</div>
       </div>
       <div class="ni-actions">
+        ${n.ephemeral ? '' : `
         <button class="ni-act${n.locked?' locked':''}" data-act="lock" data-id="${n.id}" title="${n.locked?'Unlock with passphrase':'Lock with a passphrase'}">
           <span class="ic" style="--i:url(assets/icons/lock.svg)"></span>
         </button>
         <button class="ni-act" data-act="archive" data-id="${n.id}" title="${S.view==='archive'?'Restore':'Archive'}">
           <span class="ic" style="--i:url(assets/icons/archive.svg)"></span>
-        </button>
+        </button>`}
         <button class="ni-act danger" data-act="delete" data-id="${n.id}" title="Delete">
           <span class="ic" style="--i:url(assets/icons/trash.svg)"></span>
         </button>
       </div>`;
     el.addEventListener('click',e=>{ if(!e.target.closest('.ni-actions')) openNote(n.id); });
-    el.querySelector('[data-act="lock"]').addEventListener('click',e=>{ e.stopPropagation(); lockAction(n.id); });
-    el.querySelector('[data-act="archive"]').addEventListener('click',e=>{ e.stopPropagation(); toggleArchive(n.id); });
+    if(!n.ephemeral){
+      el.querySelector('[data-act="lock"]').addEventListener('click',e=>{ e.stopPropagation(); lockAction(n.id); });
+      el.querySelector('[data-act="archive"]').addEventListener('click',e=>{ e.stopPropagation(); toggleArchive(n.id); });
+    }
     el.querySelector('[data-act="delete"]').addEventListener('click',e=>{ e.stopPropagation(); confirmDelete(n.id,n.title); });
     nl.appendChild(el);
   });
 }
 
 // ── Open / create / delete ──────────────────────────────────────────────────
+// makeEphemeralNote creates a Safe-Mode-off note. Its id is a negative,
+// session-local counter — never touches the DB, so it's gone the moment
+// GoPad closes.
+function makeEphemeralNote(){
+  const now=new Date().toISOString();
+  return {id:--S.ephCounter,title:'',content:'',file_path:'',created_at:now,updated_at:now,archived:false,locked:false,ephemeral:true};
+}
+
 async function openNote(id){
   if(S.activeId!==null && S.activeId!==id) await relockActive();
+  S.activeFilePathWS=null;
   let n;
-  try{ n=await App().GetNote(id); }
-  catch(e){ toast('Couldn’t open note'); return; }
+  if(id<0){
+    n=S.ephemeralNotes.find(x=>x.id===id);
+    if(!n){ toast('Couldn’t open note'); return; }
+  }else{
+    try{ n=await App().GetNote(id); }
+    catch(e){ toast('Couldn’t open note'); return; }
+  }
   S.activeId=id;
   q('note-title').value=n.title||'';
   setLockedState(!!n.locked,false);
@@ -1096,20 +1226,27 @@ async function openNote(id){
 // mountNote puts a readable note on screen — an unlocked one, or a locked one
 // whose passphrase was just accepted.
 async function mountNote(n){
+  resetPreviewUI();
   ED.value=n.content||'';
   UndoMgr.init();
   updateLineNumbers(); updateStatus(); updateFileTag(n.file_path);
-  hbSafe();
   q('lock-state').classList.remove('show');
   ES.style.display='none';
   EP.classList.remove('show'); void EP.offsetWidth; EP.classList.add('show');
-  await loadHls(n.id);
+  if(n.ephemeral){
+    hbTemp();
+    S.highlights=[]; renderHlOverlay(); renderHlPanel();
+  }else{
+    hbSafe();
+    await loadHls(n.id);
+  }
   ED.focus(); requestAnimationFrame(()=>SmoothCaret.update());
 }
 
 // showLockPanel replaces the editor with the locked placeholder. Nothing about
 // the note's body is on screen or in the DOM at this point.
 function showLockPanel(){
+  resetPreviewUI();
   ED.value='';
   S.highlights=[]; renderHlOverlay(); renderHlPanel();
   updateLineNumbers(); updateStatus(); updateFileTag('');
@@ -1172,7 +1309,13 @@ function canEditActive(){
 }
 
 async function closeActiveNote(){
-  await relockActive();
+  resetPreviewUI();
+  if(S.activeFilePathWS){
+    S.activeFilePathWS=null;
+    document.querySelectorAll('.fti.active').forEach(el=>el.classList.remove('active'));
+  }else{
+    await relockActive();
+  }
   S.activeId=null;
   setLockedState(false,false);
   q('note-title').value=''; ED.value='';
@@ -1182,15 +1325,129 @@ async function closeActiveNote(){
   EP.classList.remove('show'); ES.style.display='';
 }
 
+// ── Folder workspace ─────────────────────────────────────────────────────────
+// A real directory browsed and edited straight off disk — separate from the
+// SQLite notes list. Directories expand lazily (one App().ListDir() call per
+// expand), and results are cached in S.folderChildren for the session.
+async function openFolderPath(path){
+  clearTimeout(S.saveTimer);
+  await flushSave();
+  await closeActiveNote();
+  S.view='folder';
+  S.folderPath=path;
+  S.folderExpanded=new Set();
+  S.folderChildren=new Map();
+  App().SetSetting('lastFolder',path);
+  await renderFolderTab();
+}
+
+async function openFolder(){
+  let path;
+  try{ path=await App().PickFolder(); }
+  catch(e){ toast('Couldn’t open folder'); return; }
+  if(!path) return;
+  await openFolderPath(path);
+}
+
+async function renderFolderTab(){
+  syncViewChrome();
+  const nl=q('notes-list');
+  if(!S.folderPath){
+    nl.innerHTML=`<div class="sb-empty">
+      <p>Open a folder to browse and edit its files.</p>
+      <button class="btn-new-empty" id="btn-open-folder">Open Folder…</button>
+    </div>`;
+    q('btn-open-folder').addEventListener('click',openFolder);
+    return;
+  }
+  if(!S.folderChildren.has(S.folderPath)){
+    try{ S.folderChildren.set(S.folderPath, await App().ListDir(S.folderPath)); }
+    catch(e){
+      toast('Couldn’t read that folder');
+      S.folderPath=null; S.folderChildren=new Map();
+      App().SetSetting('lastFolder','');
+      return renderFolderTab();
+    }
+  }
+  nl.innerHTML='';
+  nl.appendChild(buildTreeLevel(S.folderPath,0));
+}
+
+function buildTreeLevel(dirPath,depth){
+  const frag=document.createDocumentFragment();
+  const children=S.folderChildren.get(dirPath)||[];
+  children.forEach(entry=>{
+    const expanded=S.folderExpanded.has(entry.path);
+    const row=document.createElement('div');
+    row.className='fti'+(entry.is_dir?' dir':'')+(!entry.is_dir && entry.path===S.activeFilePathWS?' active':'');
+    row.style.paddingLeft=(10+depth*16)+'px';
+    row.dataset.path=entry.path;
+    row.innerHTML=`<span class="fti-chev">${entry.is_dir?(expanded?'▾':'▸'):''}</span><span class="fti-name">${esc(entry.name)}</span>`;
+    row.addEventListener('click',()=>{ entry.is_dir ? toggleFolderDir(entry.path) : openFolderFile(entry.path); });
+    frag.appendChild(row);
+    if(entry.is_dir && expanded) frag.appendChild(buildTreeLevel(entry.path,depth+1));
+  });
+  return frag;
+}
+
+async function toggleFolderDir(path){
+  if(S.folderExpanded.has(path)){
+    S.folderExpanded.delete(path);
+  }else{
+    S.folderExpanded.add(path);
+    if(!S.folderChildren.has(path)){
+      try{ S.folderChildren.set(path, await App().ListDir(path)); }
+      catch(e){ toast('Couldn’t read that folder'); S.folderExpanded.delete(path); return; }
+    }
+  }
+  renderFolderTab();
+}
+
+// openFolderFile loads a real file into the editor, autosaving straight back
+// to it on disk — no DB row, no lock/archive/highlights, same as a temporary
+// note in that respect.
+async function openFolderFile(path){
+  if(S.activeFilePathWS===path) return;
+  clearTimeout(S.saveTimer);
+  await flushSave();
+  await closeActiveNote();
+  let content;
+  try{ content=await App().ReadDiskFile(path); }
+  catch(e){ toast('Couldn’t open that file'); return; }
+  resetPreviewUI();
+  S.activeId=null;
+  S.activeFilePathWS=path;
+  const title=q('note-title');
+  title.value=path.split('/').pop();
+  title.readOnly=true; title.classList.add('locked');
+  ED.value=content;
+  UndoMgr.init();
+  updateLineNumbers(); updateStatus(); updateFileTag(path);
+  hbSafe();
+  q('lock-state').classList.remove('show');
+  ES.style.display='none';
+  EP.classList.remove('show'); void EP.offsetWidth; EP.classList.add('show');
+  S.highlights=[]; renderHlOverlay(); renderHlPanel();
+  document.querySelectorAll('.fti').forEach(el=>el.classList.toggle('active',el.dataset.path===path));
+  ED.focus(); requestAnimationFrame(()=>SmoothCaret.update());
+}
+
 async function newNote(){
-  let n;
-  try{ n=await App().CreateNote(); }
-  catch(e){ toast('Couldn’t create note'); return; }
+  clearTimeout(S.saveTimer);
+  await flushSave(); // don't abandon a pending disk/DB write for the note we're leaving
+  let n, ephemeral=!S.safeMode;
+  if(ephemeral){
+    n=makeEphemeralNote();
+    S.ephemeralNotes.unshift(n);
+  }else{
+    try{ n=await App().CreateNote(); }
+    catch(e){ toast('Couldn’t create note'); return; }
+  }
   if(S.view!=='notes'){
     S.view='notes';
     await loadNotes();
   }else{
-    S.notes.unshift(n);
+    if(!ephemeral) S.notes.unshift(n);
     renderList(q('search-inp').value);
   }
   await openNote(n.id);
@@ -1198,9 +1455,13 @@ async function newNote(){
 
 async function confirmDelete(id,title){
   showConfirm('Delete note',`“${title||'Untitled'}” will be permanently deleted.`,async()=>{
-    try{ await App().DeleteNote(id); }
-    catch(e){ toast('Delete failed'); return; }
-    S.notes=S.notes.filter(n=>n.id!==id);
+    if(id<0){
+      S.ephemeralNotes=S.ephemeralNotes.filter(n=>n.id!==id);
+    }else{
+      try{ await App().DeleteNote(id); }
+      catch(e){ toast('Delete failed'); return; }
+      S.notes=S.notes.filter(n=>n.id!==id);
+    }
     if(S.activeId===id){
       await closeActiveNote();
     }
@@ -1211,6 +1472,7 @@ async function confirmDelete(id,title){
 
 async function toggleArchive(id=S.activeId){
   if(!id){ toast('No note selected'); return; }
+  if(id<0){ toast('Temporary notes can’t be archived'); return; }
   if(id===S.activeId){
     clearTimeout(S.saveTimer);
     await flushSave();
@@ -1238,6 +1500,7 @@ async function toggleArchive(id=S.activeId){
 // revealed → drop the lock; locked and hidden → ask for the passphrase.
 async function lockAction(id=S.activeId){
   if(!id){ toast('No note selected'); return; }
+  if(id<0){ toast('Temporary notes can’t be locked'); return; }
   const note=S.notes.find(n=>n.id===id);
   const locked=(id===S.activeId) ? S.activeLocked : !!note?.locked;
 
@@ -1287,17 +1550,23 @@ async function setView(view){
   if(S.view===view) return;
   clearTimeout(S.saveTimer);
   await flushSave();
-  S.view=view;
   await closeActiveNote();
-  await loadNotes();
-  if(S.notes.length>0) await openNote(S.notes[0].id);
+  S.view=view;
+  if(view==='folder'){
+    await renderFolderTab();
+  }else{
+    await loadNotes();
+    if(S.notes.length>0) await openNote(S.notes[0].id);
+  }
 }
 
-// ── Auto-save → WAL ─────────────────────────────────────────────────────────
+// ── Auto-save → WAL / memory / disk ─────────────────────────────────────────
 function scheduleSave(){ clearTimeout(S.saveTimer); hbWriting(); S.saveTimer=setTimeout(flushSave,900); }
 
 async function flushSave(){
+  if(S.activeFilePathWS) return flushFileSave();
   if(!S.activeId) return;
+  if(S.activeId<0) return flushEphemeralSave();
   if(S.activeLocked && !S.activeRevealed){ hbSafe(); return; }
   const title=q('note-title').value.trim()||'Untitled';
   const content=ED.value;
@@ -1315,6 +1584,27 @@ async function flushSave(){
     }
     renderList(q('search-inp').value);
   }catch(e){ hbFailed(); }
+}
+
+// flushEphemeralSave "saves" a Safe-Mode-off note — i.e. just updates the
+// in-memory object. There is nowhere durable to write it to.
+function flushEphemeralSave(){
+  const n=S.ephemeralNotes.find(x=>x.id===S.activeId);
+  if(!n) return;
+  n.title=q('note-title').value.trim()||'Untitled';
+  n.content=ED.value;
+  n.updated_at=new Date().toISOString();
+  hbTemp();
+  renderList(q('search-inp').value);
+}
+
+// flushFileSave writes the folder-workspace editor straight back to the disk
+// file it was opened from.
+async function flushFileSave(){
+  if(!S.activeFilePathWS) return;
+  const path=S.activeFilePathWS;
+  try{ await App().WriteDiskFile(path,ED.value); hbSafe(); }
+  catch(e){ hbFailed(); }
 }
 
 // ── Line numbers ────────────────────────────────────────────────────────────
@@ -1518,16 +1808,58 @@ function jumpToHl(h){
   SmoothCaret.update();
 }
 
+// Highlights need a real DB note row to attach to — unavailable for temporary
+// notes (negative id) or files opened from a folder (no id at all).
+function hlUnsupported(){ return S.activeFilePathWS || (S.activeId!=null && S.activeId<0); }
+
 function toggleHlPanel(){
   const panel = q('hl-panel'), btn = q('btn-hl-panel');
   if(!panel) return;
   const show = !panel.classList.contains('show');
+  if(show && hlUnsupported()){ toast('Highlights aren’t available for temporary notes or files opened from a folder'); return; }
   panel.classList.toggle('show', show);
   if(btn) btn.classList.toggle('active', show);
 }
 
+// ── Markdown preview ─────────────────────────────────────────────────────────
+// resetPreviewUI drops back to the editor without re-triggering its own fade
+// (the caller — mountNote/showLockPanel/closeActiveNote — already handles that).
+function resetPreviewUI(){
+  S.previewOn = false;
+  PV.classList.remove('show');
+  q('btn-preview')?.classList.remove('active');
+  const mi = q('mi-preview'); if(mi) mi.textContent = 'Show preview';
+}
+function togglePreview(){
+  const hasDoc = S.activeId!=null || S.activeFilePathWS;
+  if(!hasDoc || (S.activeLocked && !S.activeRevealed)){ toast('Open a note to preview'); return; }
+  S.previewOn = !S.previewOn;
+  q('btn-preview')?.classList.toggle('active', S.previewOn);
+  const mi = q('mi-preview'); if(mi) mi.textContent = S.previewOn ? 'Hide preview' : 'Show preview';
+  if(S.previewOn){
+    renderPreview();
+    EP.classList.remove('show');
+    PV.classList.add('show');
+  }else{
+    PV.classList.remove('show');
+    EP.classList.remove('show'); void EP.offsetWidth; EP.classList.add('show');
+    ED.focus();
+  }
+}
+async function renderPreview(){
+  const noteId = S.activeId, filePath = S.activeFilePathWS;
+  // Relative image/link references resolve against the open folder's root —
+  // only meaningful when the document being previewed actually came from one.
+  const basePath = filePath ? S.folderPath : '';
+  let html = '';
+  try{ html = await App().RenderMarkdown(ED.value, basePath||''); }
+  catch(e){ html = '<p style="color:var(--danger)">Couldn’t render preview.</p>'; }
+  if(S.previewOn && S.activeId===noteId && S.activeFilePathWS===filePath) PV.innerHTML = html;
+}
+
 // Picker
 function openHlPicker(){
+  if(hlUnsupported()){ toast('Highlights aren’t available for temporary notes or files opened from a folder'); return; }
   if(!S.activeId) return;
   if(!canEditActive()) return;
   const s = ED.selectionStart, e = ED.selectionEnd;
@@ -1582,6 +1914,25 @@ q('hl-comment-inp').addEventListener('keydown', e=>{
   if(e.key==='Escape') closeHlPicker();
 });
 q('btn-hl-panel').addEventListener('click', toggleHlPanel);
+q('btn-preview').addEventListener('click', togglePreview);
+// Links inside the preview are plain <a href> tags rendered from note content.
+// Left unhandled, clicking one navigates the WebView itself away from the app
+// (the whole window goes blank, loading the target in place of the SPA) — so
+// send http(s)/mailto links to the system browser, hand a gopadfile:// link
+// (RenderMarkdown's rewrite of a relative link to another file in the open
+// folder — see markdown.go) to the folder-workspace editor, and swallow the rest.
+PV.addEventListener('click', e=>{
+  const a = e.target.closest('a[href]');
+  if(!a) return;
+  e.preventDefault();
+  const href = a.getAttribute('href') || '';
+  if(/^(https?:|mailto:)/i.test(href)){ window.runtime.BrowserOpenURL(href); return; }
+  if(href.startsWith('gopadfile://')){
+    let path;
+    try{ path=decodeURIComponent(new URL(href).pathname); }catch(e){ return; }
+    openFolderFile(path);
+  }
+});
 q('hl-panel-close').addEventListener('click', ()=>{
   q('hl-panel').classList.remove('show'); q('btn-hl-panel').classList.remove('active');
 });
@@ -1706,7 +2057,16 @@ q('fi-close').addEventListener('click',closeFind);
 
 // ── File import / export ────────────────────────────────────────────────────
 async function saveToFile(){
+  if(S.activeFilePathWS){ await flushFileSave(); toast('Saved'); return; }
   if(!S.activeId) return;
+  if(S.activeId<0){
+    const title=q('note-title').value.trim()||'Untitled';
+    let path;
+    try{ path=await App().ExportContent(title,ED.value); }
+    catch(e){ toast('Export failed'); return; }
+    if(path) toast('Exported → '+path.split('/').pop());
+    return;
+  }
   let path;
   if(S.activeLocked && !S.activeRevealed){ toast('Unlock the note to export it'); return; }
   try{ path=await App().SaveToFile(S.activeId); }
@@ -1730,6 +2090,22 @@ async function openFile(){
     }
     await openNote(n.id); toast('Opened '+n.title);
   }
+}
+
+// importDroppedFiles imports one or more dropped files the same way "Open
+// file…" does — always durable, since a dropped file already exists
+// permanently on disk regardless of Safe Mode.
+async function importDroppedFiles(paths){
+  let lastNote=null, failed=0;
+  for(const p of paths){
+    try{ lastNote=await App().ImportFile(p); }
+    catch(e){ failed++; }
+  }
+  if(S.view!=='notes') S.view='notes';
+  await loadNotes();
+  if(lastNote) await openNote(lastNote.id);
+  if(failed) toast(`Imported ${paths.length-failed} file(s) — ${failed} failed`);
+  else toast(paths.length>1 ? `Imported ${paths.length} files` : 'File imported');
 }
 
 // ── Font, wrap, theme ───────────────────────────────────────────────────────
@@ -1796,6 +2172,44 @@ q('btn-new').addEventListener('click',newNote);
 q('btn-new-empty').addEventListener('click',newNote);
 q('tab-notes').addEventListener('click',()=>setView('notes'));
 q('tab-archive').addEventListener('click',()=>setView('archive'));
+q('tab-folder').addEventListener('click',()=>setView('folder'));
+
+// ── Safe Mode ─────────────────────────────────────────────────────────────
+function syncSafeModeUI(){
+  const btn=q('safemode-btn');
+  btn.classList.toggle('off',!S.safeMode);
+  q('safemode-label').textContent=S.safeMode?'Safe mode':'Temporary notes';
+  btn.title=S.safeMode
+    ? 'Safe Mode is on — new notes are saved to disk and survive restarts. Click to make new notes temporary instead.'
+    : 'Safe Mode is off — new notes are temporary and disappear when GoPad closes. Click to go back to saving new notes.';
+}
+function toggleSafeMode(){
+  S.safeMode=!S.safeMode;
+  App().SetSetting('safeMode',S.safeMode?'1':'0');
+  syncSafeModeUI();
+  toast(S.safeMode ? 'New notes will be saved' : 'New notes will be temporary — lost when GoPad closes');
+}
+q('safemode-btn').addEventListener('click',toggleSafeMode);
+
+// ── Drag & drop ───────────────────────────────────────────────────────────
+// Wails resolves dropped items to real filesystem paths (main.go enables
+// DragAndDrop.EnableFileDrop) — a file imports as a note, a folder opens as a
+// workspace, matching what File > Open file…/Open folder… already do.
+let dragDepth=0;
+const isFileDrag=e=>e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files');
+window.addEventListener('dragover',e=>{ if(isFileDrag(e)) e.preventDefault(); });
+window.addEventListener('dragenter',e=>{ if(isFileDrag(e)){ dragDepth++; document.body.classList.add('dropping'); } });
+window.addEventListener('dragleave',e=>{ if(isFileDrag(e)){ dragDepth=Math.max(0,dragDepth-1); if(!dragDepth) document.body.classList.remove('dropping'); } });
+window.addEventListener('drop',e=>{ if(isFileDrag(e)) e.preventDefault(); dragDepth=0; document.body.classList.remove('dropping'); });
+async function onFilesDropped(x,y,paths){
+  if(!paths || !paths.length) return;
+  if(paths.length===1){
+    let isDir=false;
+    try{ isDir=await App().IsDir(paths[0]); }catch(e){}
+    if(isDir){ await openFolderPath(paths[0]); toast('Opened folder'); return; }
+  }
+  await importDroppedFiles(paths);
+}
 q('sb-toggle').addEventListener('click',toggleSidebar);
 q('theme-btn').addEventListener('click',toggleThemeAnimated);
 q('note-title').addEventListener('input',scheduleSave);
@@ -1906,15 +2320,17 @@ const SHORTCUTS_HTML=[
 const MENU_ACTIONS={
   new:newNote,
   open:openFile,
+  openfolder:openFolder,
   export:()=>{ clearTimeout(S.saveTimer); flushSave().then(saveToFile); },
   archive:()=>toggleArchive(),
   lock:()=>lockAction(),
-  delete:()=>{ if(!S.activeId){ toast('No note selected'); return; } const n=S.notes.find(x=>x.id===S.activeId); confirmDelete(S.activeId,n?.title); },
+  delete:()=>{ if(!S.activeId){ toast('No note selected'); return; } const n=(S.activeId<0?S.ephemeralNotes:S.notes).find(x=>x.id===S.activeId); confirmDelete(S.activeId,n?.title); },
   undo:()=>{ if(canEditActive() && UndoMgr.undo()){ updateLineNumbers(); updateStatus(); scheduleSave(); } },
   redo:()=>{ if(canEditActive() && UndoMgr.redo()){ updateLineNumbers(); updateStatus(); scheduleSave(); } },
   find:openFind,
   wrap:toggleWrap,
   linenums:toggleLineNumbers,
+  preview:togglePreview,
   finc:()=>setFontSize(S.fontSize+1),
   fdec:()=>setFontSize(S.fontSize-1),
   updates:checkForUpdates,
@@ -1970,10 +2386,11 @@ document.addEventListener('wheel',e=>{
 // ── Init (wait for Wails bindings, then hydrate) ────────────────────────────
 async function init(){
   try{
-    const [theme,font,wrap,sidebar,lineNums]=await Promise.all([
+    const [theme,font,wrap,sidebar,lineNums,safeMode,lastFolder]=await Promise.all([
       App().GetSetting('theme'), App().GetSetting('fontSize'),
       App().GetSetting('wordWrap'), App().GetSetting('sidebar'),
-      App().GetSetting('lineNumbers'),
+      App().GetSetting('lineNumbers'), App().GetSetting('safeMode'),
+      App().GetSetting('lastFolder'),
     ]);
     if(theme) setTheme(theme);
     syncThemeBtn();
@@ -1981,7 +2398,10 @@ async function init(){
     if(wrap) S.wordWrap=wrap!=='0';
     if(sidebar==='1') setSidebar(true,false);
     if(lineNums) S.lineNums=lineNums!=='0';
+    if(safeMode) S.safeMode=safeMode!=='0';
+    if(lastFolder) S.folderPath=lastFolder;
   }catch(e){ /* first run, defaults are fine */ }
+  syncSafeModeUI();
 
   ED.style.whiteSpace=S.wordWrap?'pre-wrap':'pre';
   ED.style.overflowX=S.wordWrap?'hidden':'auto';
@@ -1995,6 +2415,7 @@ async function init(){
     q('upd-pct').textContent=`Downloading… ${pct}%`;
   });
   window.runtime.EventsOn('update:ready',()=>{ q('upd-pct').textContent='Verified and installed.'; });
+  window.runtime.OnFileDrop(onFilesDropped,false);
 
   await loadNotes();
   if(S.notes.length>0) await openNote(S.notes[0].id);

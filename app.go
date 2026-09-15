@@ -321,6 +321,11 @@ func (a *App) SetSetting(key, value string) error {
 
 // ── File import / export (native Wails dialogs) ────────────────────────────
 
+var fileDialogFilters = []runtime.FileFilter{
+	{DisplayName: "Text & Code", Pattern: "*.txt;*.md;*.log;*.csv;*.json;*.yaml;*.toml;*.go;*.py;*.js;*.ts;*.html;*.css;*.sh;*.rs;*.c;*.cpp;*.h"},
+	{DisplayName: "All files", Pattern: "*"},
+}
+
 // SaveToFile exports the note's content to a user-chosen path and remembers it.
 // Returns the chosen path, or "" if the user cancelled.
 func (a *App) SaveToFile(id int64) (string, error) {
@@ -348,10 +353,7 @@ func (a *App) SaveToFile(id int64) (string, error) {
 		Title:                "Save File",
 		DefaultFilename:      filepath.Base(startName),
 		CanCreateDirectories: true,
-		Filters: []runtime.FileFilter{
-			{DisplayName: "Text & Code", Pattern: "*.txt;*.md;*.log;*.csv;*.json;*.yaml;*.toml;*.go;*.py;*.js;*.ts;*.html;*.css;*.sh;*.rs;*.c;*.cpp;*.h"},
-			{DisplayName: "All files", Pattern: "*"},
-		},
+		Filters:              fileDialogFilters,
 	})
 	if err != nil || path == "" {
 		return "", err // empty path == cancelled
@@ -366,18 +368,57 @@ func (a *App) SaveToFile(id int64) (string, error) {
 	return path, nil
 }
 
+// ExportContent saves content that has no database row of its own — used to
+// export a temporary note (Safe Mode off), which was never written to SQLite.
+func (a *App) ExportContent(defaultName, content string) (string, error) {
+	if !strings.HasSuffix(defaultName, ".txt") && !strings.HasSuffix(defaultName, ".md") {
+		defaultName += ".txt"
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:                "Save File",
+		DefaultFilename:      defaultName,
+		CanCreateDirectories: true,
+		Filters:              fileDialogFilters,
+	})
+	if err != nil || path == "" {
+		return "", err
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // OpenFile imports a file from disk as a new note. Returns the created note, or
 // nil if the user cancelled.
 func (a *App) OpenFile() (*Note, error) {
 	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Open File",
-		Filters: []runtime.FileFilter{
-			{DisplayName: "Text & Code", Pattern: "*.txt;*.md;*.log;*.csv;*.json;*.yaml;*.toml;*.go;*.py;*.js;*.ts;*.html;*.css;*.sh;*.rs;*.c;*.cpp;*.h"},
-			{DisplayName: "All files", Pattern: "*"},
-		},
+		Title:   "Open File",
+		Filters: fileDialogFilters,
 	})
 	if err != nil || path == "" {
 		return nil, err
+	}
+	return a.importFile(path)
+}
+
+// ImportFile imports a file from disk as a new note, the same as OpenFile but
+// given the path directly instead of through the native picker — used for
+// drag-and-drop, where Wails already resolves the dropped item's real path.
+func (a *App) ImportFile(path string) (*Note, error) {
+	return a.importFile(path)
+}
+
+func (a *App) importFile(path string) (*Note, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("%q is a folder, not a file", path)
+	}
+	if info.Size() > maxDiskFileBytes {
+		return nil, fmt.Errorf("file is too large to import (%d bytes)", info.Size())
 	}
 
 	data, err := os.ReadFile(path)
