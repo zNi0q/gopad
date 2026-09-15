@@ -22,7 +22,13 @@ env:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-22.04
+    # ubuntu-22.04 only ships webkit2gtk-4.0, but `make build` (and everyone's
+    # local dev/install flow — see the webkit2_41 tag note in the Makefile)
+    # links against 4.1, which is what Arch, Fedora 37+, and Ubuntu 22.10+
+    # actually have. Building on 22.04 without the matching tag produced a
+    # release binary that couldn't even load libwebkit2gtk on those systems —
+    # ubuntu-24.04 only has 4.1, which keeps this job honest about it.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,13 +42,13 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
       - name: Build
         run: |
           VERSION="${{ github.event.inputs.tag || github.ref_name }}"
           CGO_ENABLED=1 go build \
-            -tags "desktop,production" \
+            -tags "desktop,production,webkit2_41" \
             -ldflags "-s -w -X main.version=${VERSION}" \
             -o gopad-linux-amd64 .
 
