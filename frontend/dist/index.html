@@ -564,9 +564,17 @@ body.dropping::after{
 #upd-notes{
   max-height:190px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);
   border-radius:8px;padding:11px 13px;margin-bottom:16px;
-  font-size:12px;line-height:1.65;color:var(--text-dim);white-space:pre-wrap;
+  font-size:12px;line-height:1.65;color:var(--text-dim);
   -webkit-user-select:text;user-select:text;
 }
+#upd-notes>*:first-child{margin-top:0}
+#upd-notes>*:last-child{margin-bottom:0}
+#upd-notes h1,#upd-notes h2,#upd-notes h3{color:var(--text-bright);font-size:1em;margin:.9em 0 .3em}
+#upd-notes p{margin:.5em 0}
+#upd-notes ul,#upd-notes ol{margin:.3em 0 .3em 1.3em}
+#upd-notes li{margin:.15em 0}
+#upd-notes a{color:var(--accent)}
+#upd-notes code{font-family:var(--font-mono);font-size:.95em;background:var(--surface);padding:.1em .3em}
 #upd-progress{display:none;margin-bottom:16px}
 #upd-progress.show{display:block}
 #upd-track{height:5px;background:var(--bg);border-radius:3px;overflow:hidden}
@@ -2325,7 +2333,7 @@ function showUpdatePill(info){
   q('update-pill').classList.add('show');
 }
 
-function openUpdateDialog(){
+async function openUpdateDialog(){
   if(!UPD.info) return;
   const i=UPD.info;
   q('upd-title').textContent=UPD.ready?'Update installed':'Update available';
@@ -2333,7 +2341,15 @@ function openUpdateDialog(){
     ? `GoPad ${i.version} is installed. Restart to start using it.`
     : `GoPad ${i.version} is available — you're on ${i.current}.`;
   const notes=q('upd-notes');
-  notes.textContent=(i.notes||'').trim()||'No release notes for this version.';
+  const raw=(i.notes||'').trim();
+  if(raw){
+    // GitHub's auto-generated release body is markdown — render it through
+    // the same pipeline as the note preview instead of dumping raw text.
+    try{ notes.innerHTML=await App().RenderMarkdown(raw,''); }
+    catch(e){ notes.textContent=raw; }
+  }else{
+    notes.textContent='No release notes for this version.';
+  }
   notes.style.display=UPD.ready?'none':'';
   q('upd-progress').classList.remove('show');
   q('upd-fill').style.width='0';
@@ -2383,6 +2399,16 @@ async function checkForUpdates(){
 q('update-pill').addEventListener('click',openUpdateDialog);
 q('upd-later').addEventListener('click',closeUpdateDialog);
 q('upd-install').addEventListener('click',runInstall);
+// Release notes are rendered markdown now, so they can contain real <a href>
+// links (PR/contributor links from GitHub's auto-generated body) — same
+// WebView-navigates-itself-away issue as the note preview, same fix.
+q('upd-notes').addEventListener('click', e=>{
+  const a=e.target.closest('a[href]');
+  if(!a) return;
+  e.preventDefault();
+  const href=a.getAttribute('href')||'';
+  if(/^(https?:|mailto:)/i.test(href)) window.runtime.BrowserOpenURL(href);
+});
 
 // ── Menu bar ────────────────────────────────────────────────────────────────
 const MENU=q('menubar');
